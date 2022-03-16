@@ -7,23 +7,40 @@ namespace UniquePairings
 {
 	class Program
 	{
+		// Add all the participants here!
+		// note: works best with even number of participants
 		static readonly List<string> Participants = new List<string>
 		{
-			"TJ",
-			"Rachel",
-			"James",
-			"Heng",
-			"Advay",
-			"Alex",
-			"Manuel",
-			"Rolf",
-			"Chris",
-			"Steve",
+			"Name1",
+			"Name2",
+			"Name3",
+			"Name4",
+			"Name5",
+			"Name6",
 		};
+
+		// If we have already met with some groups, put in the groups here
+		// so we can create more pairings and not redo partners
+		static readonly List<Group> AlreadyPairedGroups = new List<Group>
+		{
+			//new Group ("TJ", "Rachel"),
+			//new Group ("James", "Heng"),
+			//new Group ("Advay", "Alex"),
+			//new Group ("Manuel", "Rolf"),
+			//new Group ("Steve", "Chris"),
+		};
+
+		static int DesiredRounds { get; set; }
 
 		static void Main(string[] args)
 		{
-			Console.WriteLine("Hello World!");
+			// set the DesiredRounds here
+			// Default will be Participants.Count - 1
+			// but if we have added people later into
+			// AlreadyPairedGroups, we should decrease this number
+			// since we cannot guarentee the pairings we have already done
+			// will give us our desired results
+			DesiredRounds = Participants.Count - 1;
 			CreateUniquePairing();
 		}
 
@@ -31,25 +48,34 @@ namespace UniquePairings
 		{
 			var comparer = new PairedComparer();
 			var PossiblePairings = new HashSet<Group>(comparer);
+			var AlreadyPaired = new HashSet<Group>(comparer);
 			var remainingParticipants = new List<string>();
 
-			// 1) Get all possible combinations of participants
+			// Add in all the groups who have already met if any
+			foreach (var pairing in AlreadyPairedGroups)
+			{
+				AlreadyPaired.Add(pairing);
+			}
+
+			// Get all possible combinations of participants
 			foreach (var participant in Participants)
 			{
 				foreach (var partner in Participants.Where(p => p != participant))
 				{
+					var newGroup = new Group(participant, partner);
+					// if we have manually inputted this group, do not pair them again
+					if (!AlreadyPaired.Add(newGroup))
+						continue;
+
 					PossiblePairings.Add(new Group(participant, partner));
 				}
 			}
 
-			//PrintPairings(PossiblePairings);
 
-			// 2) Use Backtracking to give us the best combinations
+			// Use Backtracking to give us the best combinations
 			var groups = new List<Group>();
 			groups.AddRange(PossiblePairings);
 			BackTrackingPairings(groups, 0, new List<Round> ());
-			//PrintWorkingSet(BestSolution.workingSet);
-			//var solution = BackTrackingPairings(groups, 0, new List<Round> ());
 		}
 
 		static (int totalRounds, List<Round> workingSet) BestSolution { get;set; } = (0, new List<Round> ());
@@ -60,11 +86,8 @@ namespace UniquePairings
 		// combination!
 		static bool BackTrackingPairings (List<Group> groups, int roundNumber, List<Round> workingSet)
 		{
-			// we have all the groups - based on the number of participants, we know
-			// how many possible rounds there should be (n-1) rounds, n = participants
-
-			//// basecase, we hit enough roundnumbers
-			if (roundNumber == Participants.Count - 1)
+			//// base case, we hit enough round numbers
+			if (roundNumber == DesiredRounds)
 			{
 				PrintWorkingSet(workingSet);
 				return true;
