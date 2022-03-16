@@ -1,0 +1,268 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+
+namespace UniquePairings
+{
+	class Program
+	{
+		static readonly List<string> Participants = new List<string>
+		{
+			"TJ",
+			"Rachel",
+			"James",
+			"Heng",
+			"Advay",
+			"Alex",
+			"Manuel",
+			"Rolf",
+			"Chris",
+			"Steve",
+		};
+
+		static void Main(string[] args)
+		{
+			Console.WriteLine("Hello World!");
+			CreateUniquePairing();
+		}
+
+		static void CreateUniquePairing ()
+		{
+			var comparer = new PairedComparer();
+			var PossiblePairings = new HashSet<Group>(comparer);
+			var remainingParticipants = new List<string>();
+
+			// 1) Get all possible combinations of participants
+			foreach (var participant in Participants)
+			{
+				foreach (var partner in Participants.Where(p => p != participant))
+				{
+					PossiblePairings.Add(new Group(participant, partner));
+				}
+			}
+
+			//PrintPairings(PossiblePairings);
+
+			// 2) Use Backtracking to give us the best combinations
+			var groups = new List<Group>();
+			groups.AddRange(PossiblePairings);
+			BackTrackingPairings(groups, 0, new List<Round> ());
+			//PrintWorkingSet(BestSolution.workingSet);
+			//var solution = BackTrackingPairings(groups, 0, new List<Round> ());
+		}
+
+		static (int totalRounds, List<Round> workingSet) BestSolution { get;set; } = (0, new List<Round> ());
+
+		// We start this method with all the groups, but we can keep calling this
+		// method recursively with less groups each time and see if we can produce
+		// the correct number of pairings, if not, pop out a recursion and try the next
+		// combination!
+		static bool BackTrackingPairings (List<Group> groups, int roundNumber, List<Round> workingSet)
+		{
+			// we have all the groups - based on the number of participants, we know
+			// how many possible rounds there should be (n-1) rounds, n = participants
+
+			//// basecase, we hit enough roundnumbers
+			if (roundNumber == Participants.Count - 1)
+			{
+				PrintWorkingSet(workingSet);
+				return true;
+			}
+
+			var remainingGroups = new List<Group>();
+			remainingGroups.AddRange(groups);
+			foreach (var group in groups)
+			{
+				if (IsValidPairing(group, roundNumber, workingSet, out var nextRoundNumber))
+				{
+					if (!remainingGroups.Remove(group))
+						Console.WriteLine("ERROR");
+
+					// add this group to the workingSet's current round
+					AddToWorkingSet(workingSet, group, roundNumber);
+
+					if (BackTrackingPairings(remainingGroups, nextRoundNumber, workingSet))
+						return true;
+
+					// if we get back here, we should remove the last Group and continue our search
+					remainingGroups.Add(group);
+					RemoveFromWorkingSet(workingSet, group, roundNumber);
+				}
+			}
+
+			return false;
+		}
+
+		static bool IsValidPairing(Group group, int roundNumber, List<Round> workingSet, out int nextRoundNumber)
+		{
+			var foundGroups = 0;
+			nextRoundNumber = roundNumber;
+
+			// find the corresponding round
+			foreach (var round in workingSet)
+			{
+				if (round.RoundNumber == roundNumber)
+				{
+					foundGroups = round.Groups.Count;
+
+					// see if the new group can fit inside this round against the existing Groups
+					if (!RoundCanGoHere(round.Groups, group))
+						return false;
+				}
+			}
+
+			// if we will be at the max round group size after adding this, increase the groupsize
+			if ((foundGroups + 1) == (Participants.Count / 2))
+				nextRoundNumber++;
+
+			return true;
+		}
+
+		static bool RoundCanGoHere (List<Group> groups, Group newGroup)
+		{
+			foreach (var group in groups)
+			{
+				if (IsAlreadyParticipating(group, newGroup))
+					return false;
+				if (GroupsAreSame(group, newGroup))
+					return false;
+			}
+			return true;
+		}
+
+		static bool IsAlreadyParticipating(Group x, Group y)
+		{
+			if (x.Partner == y.Partner || x.Partner == y.Person)
+				return true;
+			if (x.Person == y.Person || x.Person == y.Partner)
+				return true;
+
+			return false;
+		}
+
+		static bool GroupsAreSame (Group x, Group y)
+		{
+			if (x is null && y is null)
+				return true;
+			if (x is null || y is null)
+				return false;
+			if (x.Partner == y.Partner && x.Person == y.Person)
+				return true;
+			if (x.Partner == y.Person && x.Person == y.Partner)
+				return true;
+
+			return false;
+		}
+
+		static void AddToWorkingSet(List<Round> workingset, Group group, int roundNumber)
+		{
+			bool isFound = false;
+
+			// look for the round and add the group
+			foreach (var round in workingset)
+			{
+				if (round.RoundNumber == roundNumber) {
+					isFound = true;
+					round.Add(group);
+					break;
+				}
+			}
+			// if we don't already have this round, create it and add group
+			if (!isFound)
+				workingset.Add(new Round(roundNumber, new List<Group>() { group }));
+		}
+
+		static void RemoveFromWorkingSet(List<Round> workingset, Group group, int roundNumber)
+		{
+			// look for the round and remove the group
+			foreach (var round in workingset)
+			{
+				if (round.RoundNumber == roundNumber)
+				{
+					round.Remove(group);
+					return;
+				}
+			}
+		}
+
+		static void PrintPairings (IEnumerable<Group> groups)
+		{
+			foreach (var group in groups)
+			{
+				Console.WriteLine($"{group.Person} - {group.Partner}");
+			}
+		}
+
+		static void PrintWorkingSet(List<Round> rounds)
+		{
+			var roundNumber = 1;
+			foreach (var round in rounds)
+			{
+				Console.WriteLine($"\nRound: {roundNumber}");
+				PrintPairings(round.Groups);
+				roundNumber++;
+			}
+		}
+	}
+
+	public class Group
+	{
+		public string Person { get; set; }
+		public string Partner { get; set; }
+
+		public Group (string person, string partner)
+		{
+			Person = person;
+			Partner = partner;
+		}
+	}
+
+	public class Round
+	{
+		public List<Group> Groups { get; set; }
+		public int RoundNumber { get; set; }
+
+		public Round(int roundNumber, List<Group> groups)
+		{
+			RoundNumber = roundNumber;
+			Groups = groups;
+		}
+
+		public void Add(Group group)
+		{
+			Groups.Add(group);
+		}
+
+		public bool Remove (Group group)
+		{
+			return Groups.Remove(group);
+		}
+	}
+
+	public class PairedComparer : IEqualityComparer<Group>
+	{
+		public bool Equals(Group x, Group y)
+		{
+			if (x is null && y is null)
+				return true;
+			if (x is null || y is null)
+				return false;
+			if (x.Partner == y.Partner && x.Person == y.Person)
+				return true;
+			if (x.Partner == y.Person && x.Person == y.Partner)
+				return true;
+
+			return false;
+		}
+
+		public int GetHashCode([DisallowNull] Group obj)
+		{
+			var one = string.Compare(obj.Person, obj.Partner);
+			if (one == -1)
+				return string.Concat(obj.Person, obj.Partner).GetHashCode();
+
+			return string.Concat(obj.Partner, obj.Person).GetHashCode();
+		}
+	}
+}
